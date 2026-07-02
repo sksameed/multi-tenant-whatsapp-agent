@@ -17,6 +17,7 @@ const __dirname = path.dirname(__filename);
 
 
 dotenv.config();
+console.log("BASE_URL:", process.env.BASE_URL);
 console.log("Gemini Key Loaded:", !!process.env.GEMINI_API_KEY);
 const app = express();
 
