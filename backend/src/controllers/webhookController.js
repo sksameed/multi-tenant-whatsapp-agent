@@ -84,28 +84,98 @@ export async function receiveWebhook(req, res) {
         //------------------------------------
         // Resolve Tenant
         //------------------------------------
-        const phoneNumberId =
-          change.metadata?.phone_number_id;
+        // ------------------------------------
+// Default Tenant (Sandbox Demo)
+// ------------------------------------
+//------------------------------------
+// Default Tenant
+//------------------------------------
+const defaultTenant = await Tenant.findOne({
+  name: "Luxury Furniture",
+});
 
-        const tenant = await Tenant.findOne({
-          phoneNumberId,
-        });
+if (!defaultTenant) {
+  console.log("❌ Default Tenant Not Found");
+  return;
+}
 
-        if (!tenant) {
-          console.log("❌ Tenant Not Found");
-          return;
-        }
+//------------------------------------
+// Find/Create Session
+//------------------------------------
+const session = await findOrCreateSession(
+  phone,
+  defaultTenant._id
+);
 
-        console.log("🏢 Tenant:", tenant.name);
+//------------------------------------
+// Current Active Tenant
+//------------------------------------
+let tenant = await Tenant.findById(
+  session.tenantId
+);
 
-        //------------------------------------
-        // Session
-        //------------------------------------
-        const session =
-          await findOrCreateSession(
-            phone,
-            tenant._id
-          );
+console.log("🏢 Active Tenant:", tenant.name);
+        // ------------------------------------
+// Tenant Switch Commands
+// ------------------------------------
+const lower = text.toLowerCase();
+
+if (
+  lower.includes("switch to automotive") ||
+  lower.includes("act like automotive") ||
+  lower.includes("use automotive")
+) {
+
+  const automotive = await Tenant.findOne({
+    name: /Automotive/i,
+  });
+
+  if (automotive) {
+
+    session.tenantId = automotive._id;
+    session.status = "WAITING_FOR_BOT";
+
+    await session.save();
+
+    await sendTextMessage(
+      phone,
+      "✅ Switched to Automotive Care. How can I help you with your vehicle today?"
+    );
+
+    console.log("🚗 Switched to Automotive");
+
+    return;
+  }
+}
+
+if (
+  lower.includes("switch to furniture") ||
+  lower.includes("switch to luxury furniture") ||
+  lower.includes("act like luxury furniture") ||
+  lower.includes("use furniture")
+) {
+
+  const furniture = await Tenant.findOne({
+    name: /Luxury Furniture/i,
+  });
+
+  if (furniture) {
+
+    session.tenantId = furniture._id;
+    session.status = "WAITING_FOR_BOT";
+
+    await session.save();
+
+    await sendTextMessage(
+      phone,
+      "✅ Switched to Luxury Furniture. How can I help you today?"
+    );
+
+    console.log("🪑 Switched to Furniture");
+
+    return;
+  }
+}
 
         //------------------------------------
         // Save User Message

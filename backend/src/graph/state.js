@@ -22,6 +22,9 @@ export const GraphState = Annotation.Root({
 
   responseType: Annotation(),
 
+  // NEW
+  media: Annotation(),
+
   mediaToSend: Annotation(),
 
   action: Annotation(),

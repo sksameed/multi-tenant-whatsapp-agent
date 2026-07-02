@@ -2,10 +2,18 @@ import mongoose from "mongoose";
 
 const SessionSchema = new mongoose.Schema(
   {
+    // Original tenant (kept for compatibility)
     tenantId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Tenant",
       required: true,
+    },
+
+    // Current assistant being used in this conversation
+    activeTenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tenant",
+      default: null,
     },
 
     phoneNumber: {

@@ -25,6 +25,9 @@ export async function reasoningNode(state) {
 
     const parsed = parseResponse(raw);
 
+    console.log("\nParsed Response:");
+    console.log(parsed);
+
     return {
 
       ...state,
@@ -32,6 +35,9 @@ export async function reasoningNode(state) {
       aiResponse: parsed.message,
 
       responseType: parsed.responseType,
+
+      // NEW
+      media: parsed.media || null,
 
     };
 
