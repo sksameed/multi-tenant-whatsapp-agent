@@ -1,16 +1,57 @@
+import Session from "../models/Session.js";
+
+// =====================================
+// Create Session
+// =====================================
+export const createSession = async (req, res) => {
+  try {
+    const session = await Session.create(req.body);
+
+    res.status(201).json({
+      success: true,
+      data: session,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// =====================================
+// Get Sessions
+// =====================================
+export const getSessions = async (req, res) => {
+  try {
+    const sessions = await Session.find()
+      .populate("tenantId")
+      .sort({ updatedAt: -1 });
+
+    res.json({
+      success: true,
+      data: sessions,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// =====================================
+// Find Existing Session or Create New One
+// =====================================
 export const findOrCreateSession = async (
   phoneNumber,
   defaultTenantId
 ) => {
 
-  // Search ONLY by phone number
   let session = await Session.findOne({
     phoneNumber,
   });
 
-  // -----------------------------
-  // First Conversation
-  // -----------------------------
   if (!session) {
 
     session = await Session.create({
@@ -24,7 +65,6 @@ export const findOrCreateSession = async (
   } else {
 
     session.status = "WAITING_FOR_BOT";
-
     session.updatedAt = new Date();
 
     await session.save();
