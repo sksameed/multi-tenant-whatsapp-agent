@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import Navbar from "../components/Navbar";
 import TenantSwitcher from "../components/TenantSwitcher";
 import SessionList from "../components/SessionList";
@@ -11,6 +12,7 @@ import { getSessions } from "../services/sessionApi";
 import { getMessages } from "../services/messageApi";
 
 const Dashboard = () => {
+
   const [tenants, setTenants] = useState([]);
   const [selectedTenant, setSelectedTenant] = useState("");
 
@@ -21,113 +23,173 @@ const Dashboard = () => {
 
   const [loading, setLoading] = useState(true);
 
-  // -----------------------------
-  // Load tenants once
-  // -----------------------------
+  // =====================================
+  // Initial Load
+  // =====================================
+
   useEffect(() => {
     loadTenants();
   }, []);
 
-  // -----------------------------
-  // Load sessions when tenant changes
-  // -----------------------------
+  // =====================================
+  // Tenant Changed
+  // =====================================
+
   useEffect(() => {
-    if (selectedTenant) {
-      setSelectedSession(null);
-      loadSessions(selectedTenant);
-    } else {
+
+    if (!selectedTenant) {
+
       setSessions([]);
       setSelectedSession(null);
-    }
-  }, [selectedTenant]);
 
-  // -----------------------------
-  // Load messages when session changes
-  // -----------------------------
-  useEffect(() => {
-    if (selectedSession) {
-      loadMessages(selectedSession._id);
-    } else {
-      setMessages([]);
+      return;
     }
-  }, [selectedSession]);
-// -----------------------------
-// Auto Refresh
-// -----------------------------
-useEffect(() => {
-  if (!selectedTenant) return;
 
-  const interval = setInterval(() => {
+    setSelectedSession(null);
+
     loadSessions(selectedTenant);
 
-    if (selectedSession) {
-      loadMessages(selectedSession._id);
-    }
-  }, 3000);
+  }, [selectedTenant]);
 
-  return () => clearInterval(interval);
-}, [selectedTenant, selectedSession]);
-  // -----------------------------
+  // =====================================
+  // Session Changed
+  // =====================================
+
+  useEffect(() => {
+
+    if (!selectedSession) {
+
+      setMessages([]);
+
+      return;
+    }
+
+    loadMessages(selectedSession._id);
+
+  }, [selectedSession]);
+
+  // =====================================
+  // Auto Refresh
+  // =====================================
+
+  useEffect(() => {
+
+    if (!selectedTenant) return;
+
+    const interval = setInterval(async () => {
+
+      await loadSessions(selectedTenant);
+
+      if (selectedSession) {
+        await loadMessages(selectedSession._id);
+      }
+
+    }, 3000);
+
+    return () => clearInterval(interval);
+
+  }, [selectedTenant, selectedSession]);
+
+  // =====================================
   // Load Tenants
-  // -----------------------------
-  const loadTenants = async () => {
+  // =====================================
+
+  async function loadTenants() {
+
     try {
+
       const response = await getTenants();
 
-      console.log("Tenants:", response.data.data);
-
       setTenants(response.data.data);
-    } catch (error) {
-      console.error("Error loading tenants:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  // -----------------------------
+    } catch (err) {
+
+      console.error(err);
+
+    } finally {
+
+      setLoading(false);
+
+    }
+
+  }
+
+  // =====================================
   // Load Sessions
-  // -----------------------------
-  const loadSessions = async (tenantId) => {
+  // =====================================
+
+  async function loadSessions(tenantId) {
+
     try {
+
       const response = await getSessions();
 
-      const tenantSessions = response.data.data.filter(
-        (session) => session.tenantId._id === tenantId
+      const filtered = response.data.data.filter(
+        (session) =>
+          session.tenantId._id === tenantId
       );
 
-      setSessions(tenantSessions);
-    } catch (error) {
-      console.error("Error loading sessions:", error);
-    }
-  };
+      setSessions(filtered);
 
-  // -----------------------------
+    } catch (err) {
+
+      console.error(err);
+
+    }
+
+  }
+
+  // =====================================
   // Load Messages
-  // -----------------------------
-  const loadMessages = async (sessionId) => {
+  // =====================================
+
+  async function loadMessages(sessionId) {
+
     try {
+
       const response = await getMessages();
 
-      const sessionMessages = response.data.data.filter(
-        (message) => message.sessionId._id === sessionId
+      const filtered = response.data.data.filter(
+        (message) =>
+          message.sessionId._id === sessionId
       );
 
-      setMessages(sessionMessages);
-    } catch (error) {
-      console.error("Error loading messages:", error);
+      setMessages(filtered);
+
+    } catch (err) {
+
+      console.error(err);
+
     }
-  };
+
+  }
 
   return (
+
     <div className="min-h-screen bg-slate-100">
+
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-6 py-4 space-y-6">
+      <div className="max-w-7xl mx-auto px-6 py-6">
 
         {loading ? (
-          <p className="text-gray-600">Loading tenants...</p>
+
+          <div className="flex justify-center py-24">
+
+            <div className="text-lg font-medium text-gray-500">
+
+              Loading Dashboard...
+
+            </div>
+
+          </div>
+
         ) : (
+
           <>
+
+            {/* Tenant */}
+
             <TenantSwitcher
               tenants={tenants}
               selectedTenant={selectedTenant}
@@ -135,45 +197,91 @@ useEffect(() => {
             />
 
             {selectedTenant && (
-              <StatsCards sessions={sessions} />
+
+              <>
+
+                <div className="mt-6">
+
+                  <StatsCards
+                    sessions={sessions}
+                  />
+
+                </div>
+
+                <div className="mt-6">
+
+                  <BroadcastDrawer
+                    tenantId={selectedTenant}
+                  />
+
+                </div>
+
+                <div className="grid grid-cols-12 gap-6 mt-6">
+
+                  {/* Session List */}
+
+                  <div className="col-span-12 lg:col-span-4">
+
+                    <SessionList
+                      sessions={sessions}
+                      selectedSession={selectedSession}
+                      onSessionSelect={
+                        setSelectedSession
+                      }
+                    />
+
+                  </div>
+
+                  {/* Chat */}
+
+                  <div className="col-span-12 lg:col-span-8">
+
+                    <ChatWindow
+                      selectedSession={
+                        selectedSession
+                      }
+                      messages={messages}
+                    />
+
+                  </div>
+
+                </div>
+
+              </>
+
             )}
+
+            {!selectedTenant && (
+
+              <div className="bg-white rounded-2xl shadow border mt-8 p-16 text-center">
+
+                <h2 className="text-3xl font-bold text-gray-700">
+
+                  Welcome 👋
+
+                </h2>
+
+                <p className="text-gray-500 mt-4">
+
+                  Select a tenant to start managing
+                  WhatsApp conversations.
+
+                </p>
+
+              </div>
+
+            )}
+
           </>
+
         )}
 
-        {selectedTenant && (
-  <>
-    {/* Broadcast */}
-    <BroadcastDrawer tenantId={selectedTenant} />
-
-    <div className="grid grid-cols-12 gap-6">
-
-      {/* Session List */}
-      <div className="col-span-4">
-        <SessionList
-          sessions={sessions}
-          selectedSession={selectedSession}
-          onSessionSelect={setSelectedSession}
-        />
-      </div>
-
-      {/* Chat Window */}
-      <div className="col-span-8">
-        <ChatWindow
-          selectedSession={selectedSession}
-          messages={messages}
-          catalogUrl={
-            tenants.find((t) => t._id === selectedTenant)?.mediaLibrary?.catalog
-          }
-        />
       </div>
 
     </div>
-  </>
-)}
 
-      </div>
-    </div>
   );
+
 };
 
 export default Dashboard;

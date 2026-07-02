@@ -7,17 +7,14 @@ import {
 } from "../services/whatsappService.js";
 
 import { findOrCreateSession } from "./sessionController.js";
+
 import Tenant from "../models/Tenant.js";
+import Message from "../models/Message.js";
 
 // =====================================
 // Webhook Verification
 // =====================================
 export async function verifyWebhook(req, res) {
-  console.log("========== WEBHOOK VERIFY ==========");
-  console.log("Mode:", req.query["hub.mode"]);
-  console.log("Token Received:", req.query["hub.verify_token"]);
-  console.log("Token In ENV:", process.env.VERIFY_TOKEN);
-  console.log("Challenge:", req.query["hub.challenge"]);
 
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -27,11 +24,12 @@ export async function verifyWebhook(req, res) {
     mode === "subscribe" &&
     token === process.env.VERIFY_TOKEN
   ) {
-    console.log("✅ VERIFIED");
+    console.log("✅ Webhook Verified");
     return res.status(200).send(challenge);
   }
 
-  console.log("❌ VERIFICATION FAILED");
+  console.log("❌ Webhook Verification Failed");
+
   return res.sendStatus(403);
 }
 
@@ -39,136 +37,193 @@ export async function verifyWebhook(req, res) {
 // Incoming WhatsApp Webhook
 // =====================================
 export async function receiveWebhook(req, res) {
-  try {
-    const body = req.body;
 
-    console.log("========== WEBHOOK RECEIVED ==========");
-    console.log(JSON.stringify(body, null, 2));
+  try {
+
+    const body = req.body;
 
     if (body.object !== "whatsapp_business_account") {
       return res.sendStatus(404);
     }
 
     const change = body.entry?.[0]?.changes?.[0]?.value;
-    const message = change?.messages?.[0];
 
-    if (!message) {
+    // Ignore delivery/read status callbacks
+    if (change?.statuses) {
       return res.sendStatus(200);
     }
 
-    // Respond to Meta immediately
+    const incoming = change?.messages?.[0];
+
+    if (!incoming) {
+      return res.sendStatus(200);
+    }
+
+    // Respond immediately to Meta
     res.sendStatus(200);
 
-    // Process in background
     (async () => {
+
       try {
-        const phone = message.from;
-        const text = message.text?.body || "";
-        const messageId = message.id;
 
-        console.log("Incoming Message:", text);
+        const phone = incoming.from;
+        const text = incoming.text?.body || "";
+        const messageId = incoming.id;
 
-        // -------------------------
-        // Mark Message as Read
-        // -------------------------
+        console.log("\n=================================");
+        console.log("📨 Incoming WhatsApp Message");
+        console.log("Phone :", phone);
+        console.log("Text  :", text);
+        console.log("=================================\n");
+
+        //------------------------------------
+        // Mark Read
+        //------------------------------------
         await markAsRead(messageId);
 
-        // -------------------------
-        // Tenant Resolution
-        // -------------------------
-        const phoneNumberId = change?.metadata?.phone_number_id;
-
-        console.log("Phone Number ID:", phoneNumberId);
+        //------------------------------------
+        // Resolve Tenant
+        //------------------------------------
+        const phoneNumberId =
+          change.metadata?.phone_number_id;
 
         const tenant = await Tenant.findOne({
           phoneNumberId,
         });
 
         if (!tenant) {
-          console.log("❌ Tenant not found");
+          console.log("❌ Tenant Not Found");
           return;
         }
 
-        console.log("✅ Tenant Found:", tenant.name);
+        console.log("🏢 Tenant:", tenant.name);
 
-        // -------------------------
-        // Find/Create Session
-        // -------------------------
-        const session = await findOrCreateSession(
-          phone,
-          tenant._id
-        );
+        //------------------------------------
+        // Session
+        //------------------------------------
+        const session =
+          await findOrCreateSession(
+            phone,
+            tenant._id
+          );
 
-        // -------------------------
-        // Invoke LangGraph
-        // -------------------------
-        const result = await graph.invoke({
+        //------------------------------------
+        // Save User Message
+        //------------------------------------
+        await Message.create({
           tenantId: tenant._id,
           sessionId: session._id,
+          sender: "user",
+          content: text,
+          messageType: "text",
+          mediaUrl: "",
+        });
+
+        console.log("✅ User Message Saved");
+
+        //------------------------------------
+        // LangGraph
+        //------------------------------------
+        const result = await graph.invoke({
+
+          tenantId: tenant._id,
+
+          sessionId: session._id,
+
           phoneNumber: phone,
+
           incomingMessage: text,
 
           tenant: null,
+
           chatHistory: [],
 
           aiResponse: null,
+
           responseType: "text",
+
           mediaToSend: null,
+
         });
 
-        console.log("Graph Action:", result.action);
+        console.log("\n🤖 Graph Action");
+        console.log(result.action);
 
-        // -------------------------
+        //------------------------------------
         // Execute Action
-        // -------------------------
+        //------------------------------------
+
         switch (result.action.type) {
+
           case "SEND_TEXT":
+
             await sendTextMessage(
               phone,
               result.action.message
             );
-            break;
 
-          case "SEND_CATALOG":
-            await sendDocumentMessage(
-              phone,
-              result.action.url,
-              "Catalog.pdf"
-            );
             break;
 
           case "SEND_IMAGE":
+
             await sendImageMessage(
               phone,
               result.action.url,
               result.action.message
             );
+
+            break;
+
+          case "SEND_CATALOG":
+
+            await sendDocumentMessage(
+              phone,
+              result.action.url,
+              "Catalog.pdf"
+            );
+
             break;
 
           case "SEND_HUMAN":
+
             await sendTextMessage(
               phone,
               result.action.message
             );
+
             break;
 
           default:
+
             await sendTextMessage(
               phone,
               result.action.message
             );
+
         }
 
-        console.log("✅ Response Sent Successfully");
+        console.log("✅ Response Sent");
 
       } catch (err) {
-        console.error("❌ Webhook Processing Error");
-        console.error(err.response?.data || err.message || err);
+
+        console.error("\n❌ WEBHOOK PROCESSING ERROR");
+
+        console.error(
+          err.response?.data ||
+          err.message ||
+          err
+        );
+
       }
+
     })();
 
   } catch (err) {
-    console.error("❌ Webhook Error:", err);
+
+    console.error(err);
+
     return res.sendStatus(500);
+
   }
+
 }

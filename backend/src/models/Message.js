@@ -24,6 +24,7 @@ const MessageSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+
     messageType: {
       type: String,
       enum: [
@@ -31,10 +32,22 @@ const MessageSchema = new mongoose.Schema(
         "image",
         "catalog",
         "document",
-        "human"
+        "human",
       ],
       default: "text",
-},
+    },
+
+    // URL of image/document (optional)
+    mediaUrl: {
+      type: String,
+      default: "",
+    },
+
+    // Optional filename (for PDFs, catalogs, etc.)
+    fileName: {
+      type: String,
+      default: "",
+    },
   },
   {
     timestamps: true,

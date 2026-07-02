@@ -1,57 +1,105 @@
+import {
+  Users,
+  Clock3,
+  UserRound,
+  CheckCircle2,
+} from "lucide-react";
+
 const StatsCards = ({ sessions = [] }) => {
 
   const active = sessions.length;
 
   const waiting = sessions.filter(
-    s => s.status === "WAITING_FOR_BOT"
+    (s) => s.status === "WAITING_FOR_BOT"
   ).length;
 
   const human = sessions.filter(
-    s => s.status === "NEEDS_HUMAN"
+    (s) => s.status === "NEEDS_HUMAN"
   ).length;
 
   const resolved = sessions.filter(
-    s => s.status === "RESOLVED"
+    (s) => s.status === "RESOLVED"
   ).length;
 
-  const Card = ({ title, value, color }) => (
-    <div className="bg-white rounded-xl shadow p-5 border">
-      <p className="text-sm text-gray-500">
-        {title}
-      </p>
-
-      <h2 className={`text-3xl font-bold mt-2 ${color}`}>
-        {value}
-      </h2>
-    </div>
-  );
+  const cards = [
+    {
+      title: "Active Sessions",
+      value: active,
+      icon: Users,
+      bg: "bg-blue-50",
+      iconBg: "bg-blue-100",
+      text: "text-blue-600",
+    },
+    {
+      title: "Waiting",
+      value: waiting,
+      icon: Clock3,
+      bg: "bg-yellow-50",
+      iconBg: "bg-yellow-100",
+      text: "text-yellow-600",
+    },
+    {
+      title: "Needs Human",
+      value: human,
+      icon: UserRound,
+      bg: "bg-red-50",
+      iconBg: "bg-red-100",
+      text: "text-red-600",
+    },
+    {
+      title: "Resolved",
+      value: resolved,
+      icon: CheckCircle2,
+      bg: "bg-green-50",
+      iconBg: "bg-green-100",
+      text: "text-green-600",
+    },
+  ];
 
   return (
-    <div className="grid grid-cols-4 gap-5 mb-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-6">
 
-      <Card
-        title="Active Sessions"
-        value={active}
-        color="text-blue-600"
-      />
+      {cards.map((card) => {
 
-      <Card
-        title="Waiting"
-        value={waiting}
-        color="text-yellow-600"
-      />
+        const Icon = card.icon;
 
-      <Card
-        title="Human Needed"
-        value={human}
-        color="text-red-600"
-      />
+        return (
+          <div
+            key={card.title}
+            className={`${card.bg} rounded-2xl shadow-sm border border-gray-200 p-5 transition-all duration-300 hover:shadow-lg hover:-translate-y-1`}
+          >
 
-      <Card
-        title="Resolved"
-        value={resolved}
-        color="text-green-600"
-      />
+            <div className="flex items-center justify-between">
+
+              <div>
+
+                <p className="text-sm font-medium text-gray-500">
+                  {card.title}
+                </p>
+
+                <h2
+                  className={`text-4xl font-bold mt-2 ${card.text}`}
+                >
+                  {card.value}
+                </h2>
+
+              </div>
+
+              <div
+                className={`${card.iconBg} p-3 rounded-xl`}
+              >
+                <Icon
+                  size={28}
+                  className={card.text}
+                />
+              </div>
+
+            </div>
+
+          </div>
+        );
+
+      })}
 
     </div>
   );

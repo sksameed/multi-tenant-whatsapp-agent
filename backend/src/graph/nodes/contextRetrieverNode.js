@@ -7,22 +7,29 @@ export async function contextRetrieverNode(state) {
   console.log("CONTEXT RETRIEVER");
   console.log("=========================");
 
+  // -----------------------------
   // Load Tenant
+  // -----------------------------
   const tenant = await Tenant.findById(state.tenantId);
 
-  // Load last 5 messages
+  if (!tenant) {
+    throw new Error("Tenant not found.");
+  }
+
+  // -----------------------------
+  // Load Conversation History
+  // -----------------------------
   const messages = await Message.find({
     sessionId: state.sessionId,
   })
     .sort({ createdAt: -1 })
-    .limit(5);
+    .limit(10)
+    .lean();
 
-  console.log("Tenant Loaded:", tenant.name);
-
-  console.log("History Loaded:", messages.length);
+  console.log("🏢 Tenant:", tenant.name);
+  console.log("💬 Messages Loaded:", messages.length);
 
   return {
-
     ...state,
 
     tenant,
@@ -32,7 +39,5 @@ export async function contextRetrieverNode(state) {
     mediaLibrary: tenant.mediaLibrary,
 
     chatHistory: messages.reverse(),
-
   };
-
 }

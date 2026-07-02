@@ -12,106 +12,183 @@ export function getAI() {
   return ai;
 }
 
-// ------------------------
+// =====================================
 // Prompt Builder
-// ------------------------
-// ------------------------
-// Prompt Builder
-// ------------------------
+// =====================================
 export function buildPrompt(state) {
+
   const history = state.chatHistory
     .map((msg) => `${msg.sender}: ${msg.content}`)
     .join("\n");
 
   return `
-You are an AI assistant.
+You are an intelligent AI customer support assistant.
 
-System Prompt:
+======================================================
+SYSTEM PROMPT
+======================================================
+
 ${state.systemPrompt}
 
-Media Library:
-${JSON.stringify(state.mediaLibrary)}
+======================================================
+MEDIA AVAILABLE
+======================================================
 
-Conversation History:
-${history}
+${JSON.stringify(state.mediaLibrary, null, 2)}
 
-Latest User Message:
+======================================================
+CONVERSATION HISTORY
+======================================================
+
+${history || "No previous conversation."}
+
+======================================================
+LATEST CUSTOMER MESSAGE
+======================================================
+
 ${state.incomingMessage}
 
-You must return ONLY valid JSON.
+======================================================
+YOUR TASK
+======================================================
 
-Rules:
+Respond ONLY with valid JSON.
 
-1. If the customer asks for a catalog, brochure, price list, or PDF:
+Never explain.
 
-Return
+Never use markdown.
 
-{
-  "responseType": "catalog",
-  "message": "Certainly! Here is our latest furniture catalog."
-}
+Never wrap JSON inside code blocks.
 
-IMPORTANT:
-- DO NOT include URLs.
-- DO NOT include filenames.
-- DO NOT invent links.
-- The application will attach the correct catalog automatically.
+Never generate URLs.
 
---------------------------------------------------
+Never generate filenames.
 
-2. If the customer asks for product images, showroom photos, sofa pictures, etc.
+The backend already knows which file/image to send.
 
-Return
+======================================================
+RESPONSE TYPES
+======================================================
 
-{
-  "responseType": "image",
-  "message": "Certainly! Here are some product images."
-}
+1. Customer asks for:
 
-IMPORTANT:
-- DO NOT include image URLs.
-- The application already knows which image to send.
-
---------------------------------------------------
-
-3. If the customer wants a human representative
+- catalog
+- brochure
+- PDF
+- invoice
+- price list
 
 Return
 
 {
-  "responseType": "human",
-  "message": "I'll connect you with a human representative."
+  "responseType":"catalog",
+  "message":"Certainly! Here is our latest catalog."
 }
 
---------------------------------------------------
+------------------------------------------------------
 
-4. Otherwise
+2. Customer asks for
+
+- image
+- picture
+- photo
+- sofa image
+- repair image
+- showroom
 
 Return
 
 {
-  "responseType": "text",
-  "message": "..."
+  "responseType":"image",
+  "message":"Certainly! Here are the requested images."
 }
 
---------------------------------------------------
+------------------------------------------------------
 
-IMPORTANT
+3. Customer asks for
 
-Return ONLY raw JSON.
+- human
+- manager
+- representative
+- support agent
 
-Do NOT use markdown.
+Return
 
-Do NOT wrap JSON inside \`\`\`json.
+{
+  "responseType":"human",
+  "message":"I'll connect you with a human representative."
+}
 
-Your response must begin with {
+------------------------------------------------------
 
-and end with }.
+4. Everything else
+
+Return
+
+{
+  "responseType":"text",
+  "message":"Helpful reply here."
+}
+
+======================================================
+EXAMPLES
+======================================================
+
+Customer:
+Hi
+
+{
+ "responseType":"text",
+ "message":"Hello! Welcome. How may I assist you today?"
+}
+
+----------------
+
+Customer:
+Show catalog
+
+{
+ "responseType":"catalog",
+ "message":"Certainly! Here is our latest catalog."
+}
+
+----------------
+
+Customer:
+Show sofa images
+
+{
+ "responseType":"image",
+ "message":"Certainly! Here are the sofa images."
+}
+
+----------------
+
+Customer:
+I want to speak with a manager
+
+{
+ "responseType":"human",
+ "message":"I'll connect you with a human representative."
+}
+
+======================================================
+FINAL RULES
+======================================================
+
+Return ONLY JSON.
+
+No markdown.
+
+No explanation.
+
+No extra text.
 `;
 }
-// ------------------------
-// Gemini Call
-// ------------------------
+
+// =====================================
+// Gemini
+// =====================================
 export async function generateResponse(prompt) {
 
   const ai = getAI();
@@ -124,33 +201,44 @@ export async function generateResponse(prompt) {
   return response.text.trim();
 }
 
-// ------------------------
-// Parse Gemini JSON
-// ------------------------
+// =====================================
+// Parse Gemini Response
+// =====================================
 export function parseResponse(raw) {
 
   try {
 
-    // Remove Markdown code fences if Gemini adds them
     let cleaned = raw.trim();
 
     if (cleaned.startsWith("```")) {
       cleaned = cleaned
         .replace(/^```json\s*/i, "")
         .replace(/^```\s*/i, "")
-        .replace(/```$/, "")
+        .replace(/```$/i, "")
         .trim();
     }
 
-    return JSON.parse(cleaned);
+    const parsed = JSON.parse(cleaned);
+
+    if (!parsed.responseType) {
+      parsed.responseType = "text";
+    }
+
+    if (!parsed.message) {
+      parsed.message = "I'm sorry, I couldn't process that request.";
+    }
+
+    return parsed;
 
   } catch (err) {
 
-    console.log("Could not parse JSON. Falling back to text.");
+    console.log("⚠ Gemini returned invalid JSON.");
+    console.log(raw);
 
     return {
       responseType: "text",
-      message: raw,
+      message:
+        "I'm sorry, I couldn't understand that. Could you please rephrase?",
     };
 
   }
