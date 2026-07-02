@@ -16,7 +16,7 @@ export default function BroadcastDrawer({ tenantId }) {
       setLoading(true);
 
       const res = await axios.post(
-        "http://localhost:5000/api/campaigns",
+        "/campaigns",
         {
           tenantId,
           name,
