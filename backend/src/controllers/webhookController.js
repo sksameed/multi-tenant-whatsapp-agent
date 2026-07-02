@@ -4,12 +4,14 @@ import {
   sendImageMessage,
   sendDocumentMessage,
   markAsRead,
-  sendTypingIndicator,
 } from "../services/whatsappService.js";
 
 import { findOrCreateSession } from "./sessionController.js";
 import Tenant from "../models/Tenant.js";
 
+// =====================================
+// Webhook Verification
+// =====================================
 export async function verifyWebhook(req, res) {
   console.log("========== WEBHOOK VERIFY ==========");
   console.log("Mode:", req.query["hub.mode"]);
@@ -33,10 +35,14 @@ export async function verifyWebhook(req, res) {
   return res.sendStatus(403);
 }
 
+// =====================================
+// Incoming WhatsApp Webhook
+// =====================================
 export async function receiveWebhook(req, res) {
   try {
     const body = req.body;
 
+    console.log("========== WEBHOOK RECEIVED ==========");
     console.log(JSON.stringify(body, null, 2));
 
     if (body.object !== "whatsapp_business_account") {
@@ -50,7 +56,7 @@ export async function receiveWebhook(req, res) {
       return res.sendStatus(200);
     }
 
-    // Respond immediately to Meta
+    // Respond to Meta immediately
     res.sendStatus(200);
 
     // Process in background
@@ -60,28 +66,19 @@ export async function receiveWebhook(req, res) {
         const text = message.text?.body || "";
         const messageId = message.id;
 
-        console.log("Incoming:", text);
+        console.log("Incoming Message:", text);
 
         // -------------------------
-        // Read Receipt
+        // Mark Message as Read
         // -------------------------
         await markAsRead(messageId);
 
         // -------------------------
-        // Typing Indicator
-        // -------------------------
-        await sendTypingIndicator(phone);
-
-        // Simulate thinking
-        await new Promise((resolve) =>
-          setTimeout(resolve, 1200)
-        );
-
-        // -------------------------
         // Tenant Resolution
         // -------------------------
-        const phoneNumberId =
-          change?.metadata?.phone_number_id;
+        const phoneNumberId = change?.metadata?.phone_number_id;
+
+        console.log("Phone Number ID:", phoneNumberId);
 
         const tenant = await Tenant.findOne({
           phoneNumberId,
@@ -92,17 +89,18 @@ export async function receiveWebhook(req, res) {
           return;
         }
 
-        // -------------------------
-        // Session
-        // -------------------------
-        const session =
-          await findOrCreateSession(
-            phone,
-            tenant._id
-          );
+        console.log("✅ Tenant Found:", tenant.name);
 
         // -------------------------
-        // LangGraph
+        // Find/Create Session
+        // -------------------------
+        const session = await findOrCreateSession(
+          phone,
+          tenant._id
+        );
+
+        // -------------------------
+        // Invoke LangGraph
         // -------------------------
         const result = await graph.invoke({
           tenantId: tenant._id,
@@ -118,13 +116,12 @@ export async function receiveWebhook(req, res) {
           mediaToSend: null,
         });
 
-        console.log("Action:", result.action);
+        console.log("Graph Action:", result.action);
 
         // -------------------------
         // Execute Action
         // -------------------------
         switch (result.action.type) {
-
           case "SEND_TEXT":
             await sendTextMessage(
               phone,
@@ -162,13 +159,16 @@ export async function receiveWebhook(req, res) {
             );
         }
 
+        console.log("✅ Response Sent Successfully");
+
       } catch (err) {
-        console.error("Webhook Processing Error:", err);
+        console.error("❌ Webhook Processing Error");
+        console.error(err.response?.data || err.message || err);
       }
     })();
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ Webhook Error:", err);
     return res.sendStatus(500);
   }
 }
