@@ -11,6 +11,12 @@ import { findOrCreateSession } from "./sessionController.js";
 import Tenant from "../models/Tenant.js";
 
 export async function verifyWebhook(req, res) {
+  console.log("========== WEBHOOK VERIFY ==========");
+  console.log("Mode:", req.query["hub.mode"]);
+  console.log("Token Received:", req.query["hub.verify_token"]);
+  console.log("Token In ENV:", process.env.VERIFY_TOKEN);
+  console.log("Challenge:", req.query["hub.challenge"]);
+
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
@@ -19,10 +25,11 @@ export async function verifyWebhook(req, res) {
     mode === "subscribe" &&
     token === process.env.VERIFY_TOKEN
   ) {
-    console.log("✅ Webhook Verified");
+    console.log("✅ VERIFIED");
     return res.status(200).send(challenge);
   }
 
+  console.log("❌ VERIFICATION FAILED");
   return res.sendStatus(403);
 }
 
